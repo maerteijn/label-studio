@@ -212,7 +212,7 @@ class InactivitySessionTimeoutMiddleWare(CommonMiddleware):
         last_login = request.session['last_login'] if 'last_login' in request.session else 0
 
         # Check if this request is too far from when the login happened
-        if (current_time - last_login) > settings.MAX_SESSION_AGE:
+        if last_login and (current_time - last_login) > settings.MAX_SESSION_AGE:
             logger.info(
                 f'Request is too far from last login {current_time - last_login:.0f} > {settings.MAX_SESSION_AGE}; logout'
             )
