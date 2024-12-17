@@ -56,6 +56,11 @@ LOGGING = {
             'handlers': ['console'],
             # 'propagate': True,
         },
+        'core': {
+            'handlers': ['console'],
+            'level': os.environ.get('LOG_LEVEL', 'INFO'),
+         },
+        'tavern': {'level': 'INFO', 'propagate': False},
         'django_auth_ldap': {'level': os.environ.get('LOG_LEVEL', 'DEBUG')},
         'rq.worker': {
             'handlers': ['console'],
