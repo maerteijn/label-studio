@@ -101,6 +101,13 @@
 
         const lsfConfig = {
           description: "Description",
+          config: `
+            <View>
+              <Polygon name="arrow" toName="image" strokeColor="red" strokeWidth="3" pointSize="large" opacity="1" polymode="arrow" />
+              <Polygon name="polygon" toName="image" strokeWidth="3" pointSize="large" opacity="0.9" polymode="polygon" />
+              <Image name="image" value="$image" zoom="true"/>
+            </View>
+          `,
           interfaces: [
               "panel",
               "update",
@@ -150,27 +157,29 @@
             predictions: [],
             id: 1,
             data: {
-              image: "https://htx-pub.s3.us-east-1.amazonaws.com/examples/images/nick-owuor-astro-nic-visuals-wDifg5xc9Z4-unsplash.jpg"
+              image: "https://upload.wikimedia.org/wikipedia/commons/3/33/Rosa_canina_blatt_2005.05.26_11.50.13.jpg"
             }
           },
           history: annotationHistory,
         };
 
-        var ls = new LabelStudio("label-studio", lsfConfig);
+        const ls = new LabelStudio("label-studio", lsfConfig);
+
+        ls.on("labelStudioLoad", (store) => {
+          const annotation = store.annotationStore.addAnnotation({
+            userGenerate: true
+          });
+          store.annotationStore.selectAnnotation(annotation.id);
+          console.log("Annotation added")
+        });
 
         ls.on("storageInitialized", (store) => {
-          ls.on("selectAnnotation", (next) => {
-            if (next.type === 'annotation') {
-              store.setHistory(annotationHistory)
-            }
-          })
-          ls.on("updateAnnotation", (_, annotation) => {
-            console.log(annotation.serializeAnnotation());
-          })
-          ls.on("regionFinishedDrawing", (region, list) => {
-            console.log("finish drawing", {region, list})
-          })
-        })
+          console.log("Store initialized");
+        });
+
+        ls.on("entityCreate", (region) => {
+          console.log("entity created", {region})
+        });
       });
     </script>
   </body>
