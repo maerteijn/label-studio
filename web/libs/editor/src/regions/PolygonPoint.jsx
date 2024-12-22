@@ -143,9 +143,9 @@ const PolygonPointRelativeCoords = types
       stage.container().style.cursor = "crosshair";
 
       /**
-       * Check if polygon > 2 points and closed point
+       * Check if polygon => minNumPoints points and closed point
        */
-      if (self.parent.closed || self.parent.points.length < 3) return;
+      if (self.parent.closed || self.parent.points.length < self.parent.minNumPoints) return;
 
       const startPoint = ev.target;
 

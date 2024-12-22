@@ -11,6 +11,11 @@ import { ToolManagerMixin } from "../../mixins/ToolManagerMixin";
 
 const hotkeys = Hotkey("Polygons");
 
+const PolyModes = {
+  POLYGON: "polygon",
+  ARROW: "arrow"
+}
+
 /**
  * The `Polygon` tag is used to add polygons to an image without selecting a label. This can be useful when you have only one label to assign to the polygon. Use for image segmentation tasks.
  *
@@ -35,6 +40,7 @@ const hotkeys = Hotkey("Polygons");
  * @param {boolean} [smart]                       - Show smart tool for interactive pre-annotations
  * @param {boolean} [smartOnly]                   - Only show smart tool for interactive pre-annotations
  * @param {pixel|none} [snap=none]                - Snap polygon to image pixels
+ * @param {polygon|line} [polyMode=polygon]       - Polygon mode: polygon or straightline
  */
 const TagAttrs = types.model({
   toname: types.maybeNull(types.string),
@@ -49,6 +55,7 @@ const TagAttrs = types.model({
 
   pointsize: types.optional(types.string, "small"),
   pointstyle: types.optional(types.string, "circle"),
+  polymode: types.optional(types.enumeration(Object.values(PolyModes)), PolyModes.POLYGON),
 });
 
 const Validation = types.model({
@@ -58,7 +65,7 @@ const Validation = types.model({
 const Model = types
   .model({
     type: "polygon",
-
+    polymodes: types.frozen(PolyModes),
     // regions: types.array(RectRegionModel),
     _value: types.optional(types.string, ""),
   })

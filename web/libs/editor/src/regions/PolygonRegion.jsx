@@ -1,6 +1,6 @@
 import Konva from "konva";
 import { memo, useContext, useEffect, useMemo } from "react";
-import { Group, Line } from "react-konva";
+import { Group, Line, Arrow } from "react-konva";
 import { destroy, detach, getRoot, isAlive, types } from "mobx-state-tree";
 
 import Constants from "../core/Constants";
@@ -22,6 +22,7 @@ import { ImageViewContext } from "../components/ImageView/ImageViewContext";
 import { FF_DEV_2432, FF_DEV_3793, isFF } from "../utils/feature-flags";
 import { fixMobxObserve } from "../utils/utilities";
 import { RELATIVE_STAGE_HEIGHT, RELATIVE_STAGE_WIDTH } from "../components/ImageView/Image";
+
 
 const PolygonRegionAbsoluteCoordsDEV3793 = types
   .model({
@@ -102,6 +103,26 @@ const Model = types
     get flattenedPoints() {
       return getFlattenedPoints(this.points);
     },
+    get polyModes() {
+      return self.control.polymodes;
+    },
+    get polyMode() {
+      return self.control.polymode;
+    },
+
+    get minNumPoints() {
+      switch (self.polyMode) {
+        case self.polyModes.ARROW: return 2;
+        default: return 3;
+      }
+    },
+    get maxNumPoints() {
+      switch (self.polyMode) {
+        case self.polyModes.ARROW: return 2;
+        default: return null;
+      }
+    },
+
   }))
   .actions((self) => {
     return {
@@ -117,7 +138,10 @@ const Model = types
             index,
           }));
         }
-        if (!isFF(FF_DEV_2432)) self.closed = self.points.length > 2;
+
+        if (!isFF(FF_DEV_2432) && (self.points.length >= self.minNumPoints)) {
+          self.closePoly();
+        }
         self.checkSizes();
       },
 
@@ -149,6 +173,9 @@ const Model = types
         const layer = e.currentTarget.getLayer();
         const zoom = self.parent.zoomScale;
 
+        // Do not show the onmouseover anchor when maxNumPoints is reached
+        if (self.maxNumPoints && self.points.length >= self.maxNumPoints) return;
+
         moveHoverAnchor({ point: [x, y], group, layer, zoom });
       },
 
@@ -172,10 +199,9 @@ const Model = types
       },
 
       deletePoint(point) {
-        const willNotEliminateClosedShape = self.points.length <= 3 && point.parent.closed;
+        const willNotEliminateClosedShape = self.points.length <= self.minNumPoints && point.parent.closed;
         const isLastPoint = self.points.length === 1;
         const isSelected = self.selectedPoint === point;
-
         if (willNotEliminateClosedShape || isLastPoint) return;
         if (isSelected) self.selectedPoint = null;
         destroy(point);
@@ -187,6 +213,10 @@ const Model = types
         const point = self.control?.getSnappedPoint({ x, y });
 
         self._addPoint(point.x, point.y);
+
+        if (self.canClose(point.x, point.y)) {
+          self.closePoly();
+        }
       },
 
       setPoints(points) {
@@ -197,6 +227,7 @@ const Model = types
       },
 
       insertPoint(insertIdx, x, y) {
+        //if (self.maxNumPoints && self.points.length == self.maxNumPoints) return;
         const pointCoords = self.control?.getSnappedPoint({
           x: self.parent.canvasToInternalX(x),
           y: self.parent.canvasToInternalY(y),
@@ -245,23 +276,31 @@ const Model = types
       },
 
       closePoly() {
-        if (self.closed || self.points.length < 3) return;
         self.closed = true;
       },
 
       canClose(x, y) {
-        if (self.points.length < 2) return false;
+        if (self.closed) return false;
 
-        const p1 = self.points[0];
-        const p2 = { x, y };
+        // We can not close when minNumPoints condition is not met
+        if (self.points.length < self.minNumPoints) return false;
 
-        const r = 50;
-        const dist_points = (p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2;
+        switch(self.polyMode) {
+          // the ARROW type should be closed with minNum points
+          case self.polyModes.ARROW: return true
+          default: {
+            const p1 = self.points[0];
+            const p2 = { x, y };
 
-        if (dist_points < r) {
-          return true;
+            const r = 50;
+            const dist_points = (p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2;
+
+            if (dist_points < r) {
+              return true;
+            }
+            return false;
+          }
         }
-        return false;
       },
 
       destroyRegion() {
@@ -307,13 +346,14 @@ const Model = types
        * @return {PolygonRegionResult}
        */
       serialize() {
-        if (!isFF(FF_DEV_2432) && self.points.length < 3) return null;
+        if (!isFF(FF_DEV_2432) && (self.points.length < self.minNumPoints)) return null;
 
         const value = {
           points: isFF(FF_DEV_3793)
             ? self.points.map((p) => [p.x, p.y])
             : self.points.map((p) => [self.convertXToPerc(p.x), self.convertYToPerc(p.y)]),
           ...(isFF(FF_DEV_2432) ? { closed: self.closed } : {}),
+
         };
 
         return self.parent.createSerializedResult(self, value);
@@ -403,10 +443,9 @@ const Poly = memo(
   observer(({ item, colors, dragProps, draggable }) => {
     const { flattenedPoints } = item;
     const name = "poly";
-
     return (
       <Group key={name} name={name}>
-        <Line
+        <Arrow
           name="_transformable"
           lineJoin="round"
           lineCap="square"
@@ -418,6 +457,7 @@ const Poly = memo(
           points={flattenedPoints}
           fill={colors.fillColor}
           closed={true}
+          pointerAtEnding={item.polyMode == item.polyModes.ARROW}
           {...dragProps}
           onTransformEnd={(e) => {
             if (e.target !== e.currentTarget) return;
